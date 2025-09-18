@@ -102,12 +102,17 @@ const title = document.getElementById('title');
 
 // --- Notes Map ---
 function applyAccidental(key, accidental){
-    const noteOrder=["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
-    const flatMap={"Db":"C#","Eb":"D#","Gb":"F#","Ab":"G#","Bb":"A#"};
-    let index=noteOrder.indexOf(key); if(index===-1) index=noteOrder.indexOf(flatMap[key])||0;
-    if(accidental==="#") index=(index+1)%noteOrder.length;
-    if(accidental==="b") index=(index-1+noteOrder.length)%noteOrder.length;
-    let newKey=noteOrder[index];
+    let newKey = key;
+
+    if(accidental==="#"){
+        const sharpMap={"C":"C#","D":"D#","E":"F","F":"F#","G":"G#","A":"A#","B":"C"};
+        newKey = sharpMap[key] || key+"#";
+    }
+    if(accidental==="b"){
+        const flatMap={"C":"Cb","D":"Db","E":"Eb","F":"Fb","G":"Gb","A":"Ab","B":"Bb"};
+        newKey = flatMap[key] || key+"b";
+    }
+
     switch(newKey){
         case "C": return ["C","Dm","Em","F","G","Am"];
         case "C#": return ["C#","D#m","E#m","F#","G#","A#m"];
@@ -123,7 +128,7 @@ function applyAccidental(key, accidental){
         case "G#": return ["G#","A#m","B#m","C#","D#","E#m"];
         case "Ab": return ["Ab","Bbm","Cm","Db","Eb","Fm"];
         case "A": return ["A","Bm","C#m","D","E","F#m"];
-        case "A#": return ["A#","Bm","Cm","D#","F","Gm"];
+        case "A#": return ["A#","Cm","Dm","D#","F","Gm"];
         case "Bb": return ["Bb","Cm","Dm","Eb","F","Gm"];
         case "B": return ["B","C#m","D#m","E","F#","G#m"];
         default: return ["C","Dm","Em","F","G","Am"];
@@ -135,9 +140,9 @@ function startTimer(){
     clearInterval(timer);
     const interval = 60000 / bpm;
     timer = setInterval(()=>{
-        // --- Set beat color BEFORE increment ---
+        // --- Beat indicator ---
         if(cyclePos === 0){
-            beatLabel.style.color = "lime"; // first beat of cycle
+            beatLabel.style.color = "lime"; // first beat
         } else {
             beatLabel.style.color = (cyclePos % 2 === 1) ? "red" : "yellow";
         }
@@ -172,20 +177,64 @@ function startTimer(){
 
 // --- Event Listeners ---
 bpmSlider.addEventListener('input', ()=>{ bpm=parseInt(bpmSlider.value); bpmLabel.textContent=bpm; if(isRunning) startTimer(); });
+
 startStop.addEventListener('click', ()=>{
     if(isRunning){ clearInterval(timer); isRunning=false; startStop.textContent="Start"; }
     else{ cyclePos=0; startTimer(); isRunning=true; startStop.textContent="Stop"; }
 });
+
 repeatBtn.addEventListener('click', ()=>{
     repeatMode=!repeatMode;
-    if(repeatMode){ repeatBtn.textContent="Repeat On"; repeatBtn.classList.add("active"); repeatChords=Array.from({length:4},()=>notes[Math.floor(Math.random()*notes.length)]); repeatIndex=0; nextChord=repeatChords[0]; }
-    else{ repeatBtn.textContent="Repeat Off"; repeatBtn.classList.remove("active"); nextChord=notes[Math.floor(Math.random()*notes.length)]; }
+    if(repeatMode){ 
+        repeatBtn.textContent="Repeat On"; 
+        repeatBtn.classList.add("active"); 
+        repeatChords=Array.from({length:4},()=>notes[Math.floor(Math.random()*notes.length)]); 
+        repeatIndex=0; 
+        nextChord=repeatChords[0]; 
+    }
+    else{ 
+        repeatBtn.textContent="Repeat Off"; 
+        repeatBtn.classList.remove("active"); 
+        nextChord=notes[Math.floor(Math.random()*notes.length)]; 
+    }
     nextChordLabel.textContent=nextChord;
 });
-resetCount.addEventListener('click', ()=>{ chordCount=0; chordCountLabel.textContent=chordCount; localStorage.setItem('chordCount',chordCount); });
-keys.forEach(btn=>btn.addEventListener('click', ()=>{ currentKey=btn.dataset.key; notes=applyAccidental(currentKey,currentAccidental); nextChord=notes[Math.floor(Math.random()*notes.length)]; nextChordLabel.textContent=nextChord; }));
-accidentals.forEach(btn=>btn.addEventListener('click', ()=>{ let acc=btn.dataset.acc; currentAccidental=(currentAccidental===acc)?"":acc; notes=applyAccidental(currentKey,currentAccidental); nextChord=notes[Math.floor(Math.random()*notes.length)]; nextChordLabel.textContent=nextChord; }));
-cycleButtons.forEach(btn=>btn.addEventListener('click', ()=>{ chordCycle=parseInt(btn.dataset.cycle); cyclePos=0; cycleButtons.forEach(b=>b.classList.remove("active")); btn.classList.add("active"); }));
+
+resetCount.addEventListener('click', ()=>{
+    chordCount=0; 
+    chordCountLabel.textContent=chordCount; 
+    localStorage.setItem('chordCount',chordCount);
+});
+
+keys.forEach(btn=>btn.addEventListener('click', ()=>{
+    keys.forEach(b=>b.classList.remove("active"));
+    btn.classList.add("active");
+
+    currentKey=btn.dataset.key; 
+    notes=applyAccidental(currentKey,currentAccidental); 
+    nextChord=notes[Math.floor(Math.random()*notes.length)]; 
+    nextChordLabel.textContent=nextChord;
+}));
+
+accidentals.forEach(btn=>btn.addEventListener('click', ()=>{
+    accidentals.forEach(b=>b.classList.remove("active"));
+    if(currentAccidental === btn.dataset.acc){
+        currentAccidental=""; // toggle off
+    } else {
+        currentAccidental=btn.dataset.acc; 
+        btn.classList.add("active");
+    }
+    notes=applyAccidental(currentKey,currentAccidental); 
+    nextChord=notes[Math.floor(Math.random()*notes.length)]; 
+    nextChordLabel.textContent=nextChord;
+}));
+
+cycleButtons.forEach(btn=>btn.addEventListener('click', ()=>{
+    chordCycle=parseInt(btn.dataset.cycle); 
+    cyclePos=0; 
+    cycleButtons.forEach(b=>b.classList.remove("active")); 
+    btn.classList.add("active");
+}));
 
 // --- Scaling ---
 function scaleUI(){
@@ -210,7 +259,6 @@ noteLabel.textContent="-";
 nextChordLabel.textContent=nextChord;
 chordCountLabel.textContent=chordCount;
 bpmLabel.textContent=bpm;
-
 </script>
 </body>
 </html>
