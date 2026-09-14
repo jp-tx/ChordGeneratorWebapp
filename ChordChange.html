@@ -18,9 +18,12 @@ select { margin-left:10px; padding:5px; background:#282828; color:white; border:
 input[type=number] { width:50px; padding:5px; background:#282828; color:white; border:none; margin:0 5px; }
 #tempoTimerControls { display:flex; flex-wrap:wrap; align-items:center; margin:0 10px 10px; }
 .bpm-adjust { padding:10px 12px; }
+#flash { position:fixed; inset:0; background:#fff; opacity:0; pointer-events:none; z-index:9999; }
 </style>
 </head>
 <body>
+
+<div id="flash"></div>
 
 <h1 id="title">Chord Change Practicer</h1>
 
@@ -207,11 +210,28 @@ function setBpm(newBpm){
     if(isRunning) startBeatTimer();
 }
 
+// Bright full-window flash, used to call out a tempo increase.
+const flashEl = document.getElementById('flash');
+function flashScreen(){
+    flashEl.style.transition = 'none';
+    flashEl.style.opacity = '1';
+    void flashEl.offsetWidth; // force reflow so the fade-out transition below applies
+    flashEl.style.transition = 'opacity 500ms ease-out';
+    flashEl.style.opacity = '0';
+}
+
+// Change BPM by delta and flash the screen if it actually increased (accounts for clamping).
+function bumpBpm(delta){
+    const before = bpm;
+    setBpm(bpm + delta);
+    if(bpm > before) flashScreen();
+}
+
 bpmSlider.addEventListener('input', ()=>{ setBpm(parseInt(bpmSlider.value)); });
-bpmMinus5.addEventListener('click', ()=>{ setBpm(bpm-5); });
-bpmMinus1.addEventListener('click', ()=>{ setBpm(bpm-1); });
-bpmPlus1.addEventListener('click', ()=>{ setBpm(bpm+1); });
-bpmPlus5.addEventListener('click', ()=>{ setBpm(bpm+5); });
+bpmMinus5.addEventListener('click', ()=>{ bumpBpm(-5); });
+bpmMinus1.addEventListener('click', ()=>{ bumpBpm(-1); });
+bpmPlus1.addEventListener('click', ()=>{ bumpBpm(1); });
+bpmPlus5.addEventListener('click', ()=>{ bumpBpm(5); });
 
 // --- Metronome start/stop ---
 function startMetronome(){
@@ -244,7 +264,7 @@ function startTempoTimer(){
     const seconds = Math.max(1, parseInt(timerInterval.value) || 30);
     tempoTimerId = setInterval(()=>{
         const advance = parseInt(timerAdvance.value) || 1;
-        setBpm(bpm + advance);
+        bumpBpm(advance);
     }, seconds * 1000);
     tempoTimerRunning = true;
     timerStartStop.textContent = "Stop Timer";
