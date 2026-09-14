@@ -15,6 +15,9 @@ button.active { background:red; }
 #keys, #accidentals, #cycleButtons { display:flex; flex-wrap:wrap; margin:5px; }
 select { margin-left:10px; padding:5px; background:#282828; color:white; border:none; }
 .chord-count { margin-right:20px; } /* space between chord count and sound selector */
+input[type=number] { width:50px; padding:5px; background:#282828; color:white; border:none; margin:0 5px; }
+#tempoTimerControls { display:flex; flex-wrap:wrap; align-items:center; margin:0 10px 10px; }
+.bpm-adjust { padding:10px 12px; }
 </style>
 </head>
 <body>
@@ -24,12 +27,21 @@ select { margin-left:10px; padding:5px; background:#282828; color:white; border:
 <div id="controls">
     BPM: <input type="range" id="bpmSlider" min="30" max="180" value="100">
     <span id="bpmLabel">100</span>
+    <button id="bpmMinus5" class="bpm-adjust">-5</button>
+    <button id="bpmMinus1" class="bpm-adjust">-1</button>
+    <button id="bpmPlus1" class="bpm-adjust">+1</button>
+    <button id="bpmPlus5" class="bpm-adjust">+5</button>
     <button id="startStop">Start</button>
     <button id="repeatBtn">Repeat Off</button>
     <button id="resetCount">Reset Count</button>
     Chord Changes: <span id="chordCount" class="chord-count">0</span>
     Click Sound:
     <select id="wavSelector"></select>
+</div>
+
+<div id="tempoTimerControls">
+    Tempo Timer: every <input type="number" id="timerInterval" min="1" value="30"> sec increase BPM by <input type="number" id="timerAdvance" min="1" value="5">
+    <button id="timerStartStop">Start Timer</button>
 </div>
 
 <div>
@@ -84,13 +96,21 @@ wavSelector.addEventListener('change', ()=>{ clickSoundElement.src = wavSelector
 let bpm=100, isRunning=false, repeatMode=false, chordCycle=4, cyclePos=0;
 let chordCount=parseInt(localStorage.getItem('chordCount'))||0;
 let currentKey="C", currentAccidental="", notes=[], nextChord="-";
-let repeatChords=[], repeatIndex=0, timer=null;
+let repeatChords=[], repeatIndex=0, beatTimer=null;
+let tempoTimerRunning=false, tempoTimerId=null;
 
 const bpmSlider = document.getElementById('bpmSlider');
 const bpmLabel = document.getElementById('bpmLabel');
+const bpmMinus5 = document.getElementById('bpmMinus5');
+const bpmMinus1 = document.getElementById('bpmMinus1');
+const bpmPlus1 = document.getElementById('bpmPlus1');
+const bpmPlus5 = document.getElementById('bpmPlus5');
 const startStop = document.getElementById('startStop');
 const repeatBtn = document.getElementById('repeatBtn');
 const resetCount = document.getElementById('resetCount');
+const timerInterval = document.getElementById('timerInterval');
+const timerAdvance = document.getElementById('timerAdvance');
+const timerStartStop = document.getElementById('timerStartStop');
 const noteLabel = document.getElementById('note');
 const nextChordLabel = document.getElementById('nextChord');
 const beatLabel = document.getElementById('beat');
@@ -135,11 +155,11 @@ function applyAccidental(key, accidental){
     }
 }
 
-// --- Timer ---
-function startTimer(){
-    clearInterval(timer);
+// --- Beat Timer (metronome) ---
+function startBeatTimer(){
+    clearInterval(beatTimer);
     const interval = 60000 / bpm;
-    timer = setInterval(()=>{
+    beatTimer = setInterval(()=>{
         // --- Beat indicator ---
         if(cyclePos === 0){
             beatLabel.style.color = "lime"; // first beat
@@ -176,11 +196,73 @@ function startTimer(){
 }
 
 // --- Event Listeners ---
-bpmSlider.addEventListener('input', ()=>{ bpm=parseInt(bpmSlider.value); bpmLabel.textContent=bpm; if(isRunning) startTimer(); });
+
+// Set BPM, clamped to the slider's range, restarting the beat timer if running.
+function setBpm(newBpm){
+    const min = parseInt(bpmSlider.min);
+    const max = parseInt(bpmSlider.max);
+    bpm = Math.min(max, Math.max(min, newBpm));
+    bpmSlider.value = bpm;
+    bpmLabel.textContent = bpm;
+    if(isRunning) startBeatTimer();
+}
+
+bpmSlider.addEventListener('input', ()=>{ setBpm(parseInt(bpmSlider.value)); });
+bpmMinus5.addEventListener('click', ()=>{ setBpm(bpm-5); });
+bpmMinus1.addEventListener('click', ()=>{ setBpm(bpm-1); });
+bpmPlus1.addEventListener('click', ()=>{ setBpm(bpm+1); });
+bpmPlus5.addEventListener('click', ()=>{ setBpm(bpm+5); });
+
+// --- Metronome start/stop ---
+function startMetronome(){
+    if(isRunning) return;
+    cyclePos = 0;
+    startBeatTimer();
+    isRunning = true;
+    startStop.textContent = "Stop";
+}
+
+function stopMetronome(){
+    if(!isRunning) return;
+    clearInterval(beatTimer);
+    isRunning = false;
+    startStop.textContent = "Start";
+    // Stopping the metronome always stops the tempo timer too.
+    stopTempoTimer();
+}
 
 startStop.addEventListener('click', ()=>{
-    if(isRunning){ clearInterval(timer); isRunning=false; startStop.textContent="Start"; }
-    else{ cyclePos=0; startTimer(); isRunning=true; startStop.textContent="Stop"; }
+    if(isRunning) stopMetronome();
+    else startMetronome();
+});
+
+// --- Tempo Timer (repeatedly advances the BPM) ---
+// Starting the timer starts the metronome; stopping either one stops both.
+function startTempoTimer(){
+    if(tempoTimerRunning) return;
+    startMetronome();
+    const seconds = Math.max(1, parseInt(timerInterval.value) || 30);
+    tempoTimerId = setInterval(()=>{
+        const advance = parseInt(timerAdvance.value) || 1;
+        setBpm(bpm + advance);
+    }, seconds * 1000);
+    tempoTimerRunning = true;
+    timerStartStop.textContent = "Stop Timer";
+    timerStartStop.classList.add("active");
+}
+
+function stopTempoTimer(){
+    if(!tempoTimerRunning) return;
+    clearInterval(tempoTimerId);
+    tempoTimerRunning = false;
+    timerStartStop.textContent = "Start Timer";
+    timerStartStop.classList.remove("active");
+}
+
+timerStartStop.addEventListener('click', ()=>{
+    // Stopping the timer stops the metronome (which in turn stops the timer).
+    if(tempoTimerRunning) stopMetronome();
+    else startTempoTimer();
 });
 
 repeatBtn.addEventListener('click', ()=>{
