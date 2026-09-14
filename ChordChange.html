@@ -228,10 +228,10 @@ function bumpBpm(delta){
 }
 
 bpmSlider.addEventListener('input', ()=>{ setBpm(parseInt(bpmSlider.value)); });
-bpmMinus5.addEventListener('click', ()=>{ bumpBpm(-5); });
-bpmMinus1.addEventListener('click', ()=>{ bumpBpm(-1); });
-bpmPlus1.addEventListener('click', ()=>{ bumpBpm(1); });
-bpmPlus5.addEventListener('click', ()=>{ bumpBpm(5); });
+bpmMinus5.addEventListener('click', ()=>{ setBpm(bpm-5); });
+bpmMinus1.addEventListener('click', ()=>{ setBpm(bpm-1); });
+bpmPlus1.addEventListener('click', ()=>{ setBpm(bpm+1); });
+bpmPlus5.addEventListener('click', ()=>{ setBpm(bpm+5); });
 
 // --- Metronome start/stop ---
 function startMetronome(){
